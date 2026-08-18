@@ -23,7 +23,7 @@ public class RandomGenerator {
         this.arrivals = new Exp(rngs, 0);
         this.serviceA = new Exp(rngs, 1);
 
-        // SERVER B: Usa l'Iperesponenziale! (Esempio: Coefficiente di variazione = 2.0)
+        // SERVER B: Iperesponenziale (alta variabilità della sessione utente, CV = 2.0)
         this.serviceB = new HyperExp(rngs, 2, 2.0);
 
         this.serviceP = new Exp(rngs, 3);
@@ -47,7 +47,7 @@ public class RandomGenerator {
     }
 
     /**
-     * Genera il tempo di servizio per il Server B (che ora è Iperesponenziale).
+     * Genera il tempo di servizio per il Server B (iperesponenziale).
      */
     public double getServiceTimeB(double meanServiceTime) {
         return serviceB.generate(meanServiceTime);

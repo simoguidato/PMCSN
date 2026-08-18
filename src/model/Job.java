@@ -4,6 +4,7 @@ package model;
 public class Job {
     private int id;
     private double arrivalTime;
+    private double stationEntryTime; // istante di ingresso nella stazione CORRENTE (per il tempo di risposta per-visita)
     private JobClass currentClass;
     private double remainingLife; // Lavoro rimanente per il PS
 
@@ -11,6 +12,7 @@ public class Job {
     public Job(int id, double arrivalTime, JobClass currentClass, double initialDemand) {
         this.id = id;
         this.arrivalTime = arrivalTime;
+        this.stationEntryTime = arrivalTime;
         this.currentClass = currentClass;
         this.remainingLife = initialDemand;
     }
@@ -18,12 +20,16 @@ public class Job {
     // Costruttore senza ID
     public Job(double arrivalTime, JobClass currentClass, double initialDemand) {
         this.arrivalTime = arrivalTime;
+        this.stationEntryTime = arrivalTime;
         this.currentClass = currentClass;
         this.remainingLife = initialDemand;
     }
 
     public int getId() { return id; }
     public double getArrivalTime() { return arrivalTime; }
+
+    public double getStationEntryTime() { return stationEntryTime; }
+    public void setStationEntryTime(double stationEntryTime) { this.stationEntryTime = stationEntryTime; }
 
     public JobClass getCurrentClass() { return currentClass; }
     public void setCurrentClass(JobClass currentClass) { this.currentClass = currentClass; }

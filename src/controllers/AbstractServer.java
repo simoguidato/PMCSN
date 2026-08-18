@@ -39,12 +39,13 @@ public abstract class AbstractServer implements IServer {
 
     @Override
     public void computeJobsAdvancement(double startTs, double endTs, Double completedJobResponseTime) throws Exception {
-        int completedJob = completedJobResponseTime == null ? 0 : 1;
-        int jobAdvanced = jobs.size() + completedJob;
+        // Il job in completamento (se presente) è già dentro 'jobs' a questo punto
+        // (viene rimosso solo dopo, con popCompletedJob() chiamato dal motore).
+        // Quindi jobs.size() conta già correttamente tutti gli N job che si dividono
+        // la capacità nell'intervallo [startTs, endTs]: NON va sommato di nuovo.
+        int jobAdvanced = jobs.size();
 
-        // stats.updateServerStats(startTs, endTs, jobAdvanced, completedJobResponseTime, this.serverState, this.capacity);
-
-        if(completedJob == 1) {
+        if (completedJobResponseTime != null) {
             if(this.movingWindowResponseTime.size() == SLIDING_WINDOW_SIZE) {
                 this.movingWindowResponseTime.removeFirst();
             }
