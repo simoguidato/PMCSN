@@ -40,20 +40,6 @@ public class TransientSampler {
             t = segmentEnd;
         }
     }
-    /**
-     * Resetta le statistiche e i contatori temporali.
-     * Da chiamare al termine del periodo di warm-up.
-     */
-    public void reset() {
-        this.nextSampleBoundary = this.sampleInterval;
-        this.areaA = 0.0;
-        this.areaB = 0.0;
-        this.areaP = 0.0;
-
-        this.nA.clear();
-        this.nB.clear();
-        this.nP.clear();
-    }
 
     public List<Double> getNA() { return nA; }
     public List<Double> getNB() { return nB; }

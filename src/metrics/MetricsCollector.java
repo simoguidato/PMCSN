@@ -144,5 +144,4 @@ public class MetricsCollector {
         responseTimesSystem.clear();
         responseTimesB.clear();
     }
-
 }

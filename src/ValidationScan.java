@@ -6,6 +6,7 @@ import utils.Params;
 import utils.RandomGenerator;
 
 import java.io.FileWriter;
+import java.util.Locale;
 
 public class ValidationScan {
 
@@ -50,7 +51,7 @@ public class ValidationScan {
                     double XB = ctx.metrics.getThroughputB(clock);
                     double XP = ctx.metrics.getThroughputP(clock);
 
-                    fw.write(String.format(
+                    fw.write(String.format(Locale.US,
                             "%s,%.2f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f,%.6f%n",
                             scenario, lambda, R, NA, NB, NP, (NA + NB + NP), UA, UB, UP, XA, XB, XP));
 
