@@ -4,6 +4,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class BatchMeansAnalyzer {
+    private BatchMeansAnalyzer() {
+        /* This utility class should not be instantiated */
+    }
+
 
     public static class ConfidenceInterval {
         public final double mean;
@@ -25,7 +29,7 @@ public class BatchMeansAnalyzer {
         }
     }
 
-    /** Divide una sequenza job-indicizzata (es. i tempi di risposta) in batch di dimensione fissa. */
+    /* --Divide una sequenza job-indicizzata in batch di dimensione fissa.-- */
     public static List<Double> batchMeansFromSequence(List<Double> observations, int batchSize) {
         List<Double> means = new ArrayList<>();
         int n = observations.size();
@@ -40,7 +44,7 @@ public class BatchMeansAnalyzer {
         return means;
     }
 
-    /** Media e IC al 95% a partire da medie di batch (assunte quasi indipendenti). */
+    /* --Media e IC al 95% a partire da medie di batch.-- */
     public static ConfidenceInterval computeCI(List<Double> batchMeans) {
         int m = batchMeans.size();
         if (m < 2) throw new IllegalArgumentException("Servono almeno 2 batch per calcolare un IC.");
@@ -62,8 +66,7 @@ public class BatchMeansAnalyzer {
 
     /**
      * Approssimazione del quantile t di Student al 97.5% (IC al 95% bilatero),
-     * espansione di Cornish-Fisher al primo ordine. Accurata per df >= 20 (errore < 0.5%),
-     * che è il nostro caso avendo almeno una cinquantina di batch.
+     * espansione al primo ordine. Accurata per df >= 20 (errore < 0.5%)
      */
     public static double studentT975(int df) {
         final double z = 1.959964; // quantile normale standard al 97.5%

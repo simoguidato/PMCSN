@@ -14,12 +14,12 @@ public class SimulationEngine {
         this.nextArrival = ctx.rng.getInterarrivalTime(ctx.params.lambda);
     }
 
-    /** Istante corrente dell'orologio di simulazione (utile per calcolare le medie a fine run). */
+    /* Istante corrente dell'orologio di simulazione (utile per calcolare le medie a fine run). */
     public double getClock() {
         return clock;
     }
 
-    /** Esegue la simulazione fino a un numero fissato di job completati. */
+    /* Esegue la simulazione fino a un numero fissato di job completati. */
     public void run(long maxJobs) {
         System.out.println("Avvio Simulazione PS...");
 
@@ -28,7 +28,7 @@ public class SimulationEngine {
         }
     }
 
-    /** Esegue la simulazione fino a un orizzonte temporale fisso (per l'analisi del transitorio). */
+    /* Esegue la simulazione fino a un orizzonte temporale fisso (per l'analisi del transitorio). */
     public void runForTime(double horizon) {
         System.out.println("Avvio Simulazione PS (orizzonte temporale = " + horizon + "s)...");
 
@@ -39,8 +39,8 @@ public class SimulationEngine {
     }
 
     /**
-     * Esegue un singolo passo del motore (un evento). Se il prossimo evento cadrebbe oltre
-     * 'horizonCap', porta comunque le metriche fino a horizonCap e si ferma lì (usato da runForTime).
+     * Esegue un singolo evento. Se il prossimo evento cadrebbe oltre
+     * 'horizonCap', porta comunque le metriche fino a horizonCap e si ferma lì.
      * Ritorna true se l'orizzonte è stato raggiunto e la simulazione deve fermarsi.
      */
     private boolean stepEvent(double horizonCap) {

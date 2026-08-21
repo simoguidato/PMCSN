@@ -4,13 +4,14 @@ import model.Job;
 import model.ServerState;
 
 import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Locale;
 
-// NOTA: Assicurati di avere le tue classi JobList e ServerStats nel posto giusto!
+
 import model.JobList;
-import metrics.ServerStats; // Adegua l'import in base a dove hai messo ServerStats
+import metrics.ServerStats;
 
 public abstract class AbstractServer implements IServer {
     private final DecimalFormat f;
@@ -21,14 +22,14 @@ public abstract class AbstractServer implements IServer {
     private Deque<Double> movingWindowResponseTime;
     private static final int SLIDING_WINDOW_SIZE = 1000;
 
-    public AbstractServer(double capacity, ServerState serverState, int index) {
+    protected AbstractServer(double capacity, ServerState serverState, int index) {
         this.serverState = serverState;
         this.capacity = capacity;
         this.jobs = new JobList();
         this.stats = new ServerStats(index); // Se richiede index
         this.movingWindowResponseTime = new ArrayDeque<>();
 
-        this.f = (DecimalFormat) DecimalFormat.getInstance(Locale.US);
+        this.f = (DecimalFormat) NumberFormat.getInstance(Locale.US);
         this.f.applyPattern("###0.00000000");
     }
 
@@ -40,9 +41,9 @@ public abstract class AbstractServer implements IServer {
     @Override
     public void computeJobsAdvancement(double startTs, double endTs, Double completedJobResponseTime) throws Exception {
         // Il job in completamento (se presente) è già dentro 'jobs' a questo punto
-        // (viene rimosso solo dopo, con popCompletedJob() chiamato dal motore).
+        // (viene rimosso solo dopo, con popCompletedJob() chiamato dal simulatore).
         // Quindi jobs.size() conta già correttamente tutti gli N job che si dividono
-        // la capacità nell'intervallo [startTs, endTs]: NON va sommato di nuovo.
+        // la capacità nell'intervallo [startTs, endTs].
         int jobAdvanced = jobs.size();
 
         if (completedJobResponseTime != null) {
@@ -76,7 +77,6 @@ public abstract class AbstractServer implements IServer {
     @Override
     public Job getMinRemainingLifeJob() { return jobs.getMinRemainingLifeJob(); }
 
-    // Lasciamo questo metodo astratto affinché lo implementi il PSServer
     @Override
     public abstract Job popCompletedJob();
 }

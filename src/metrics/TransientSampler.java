@@ -18,7 +18,7 @@ public class TransientSampler {
         this.nextSampleBoundary = sampleInterval;
     }
 
-    /** Da chiamare per ogni intervallo [startTs,endTs] del motore, con la size corrente di ciascun server. */
+    /* per ogni intervallo [startTs,endTs] del motore, con la size corrente di ciascun server. */
     public void advance(double startTs, double endTs, int sizeA, int sizeB, int sizeP) {
         double t = startTs;
         while (t < endTs) {

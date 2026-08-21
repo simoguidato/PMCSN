@@ -159,7 +159,7 @@ public class Rngs {
 	  
           line = ReadThis.readLine();
           x = Long.parseLong(line);
-        } catch (IOException | NumberFormatException e) {
+        } catch (IOException | NumberFormatException _) {
         }
           ok = (0 < x) && (x < MODULUS);
         if (!ok)

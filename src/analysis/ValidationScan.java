@@ -1,3 +1,5 @@
+package analysis;
+
 import controllers.PSServer;
 import engine.SimulationEngine;
 import engine.SystemContext;
@@ -13,7 +15,7 @@ public class ValidationScan {
     public static void main(String[] args) throws Exception {
 
         long seed = 123456789L;      // stesso seed per tutti i punti: le differenze sono solo dovute a lambda/scenario
-        long jobsPerRun = 200_000;   // qui non serve il rigore degli IC, solo un confronto qualitativo sulla forma delle curve
+        long jobsPerRun = 200_000;
 
         double[] lambdas = new double[15];
         for (int i = 0; i < 15; i++) lambdas[i] = 0.5 + i * 0.05;

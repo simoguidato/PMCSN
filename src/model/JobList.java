@@ -43,7 +43,7 @@ public class JobList {
         return min;
     }
 
-    // Restituisce l'oggetto Job che ha la vita residua minore (quello che finirà per primo)
+    // Restituisce l'oggetto Job che ha la vita residua minore
     public Job getMinRemainingLifeJob() {
         if (jobs.isEmpty()) return null;
 

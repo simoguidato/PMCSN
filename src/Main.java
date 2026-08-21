@@ -70,7 +70,7 @@ public class Main {
         System.out.println("U_P: " + BatchMeansAnalyzer.computeCI(tb.getBatchMeansUP()));
         System.out.println("X_P: " + BatchMeansAnalyzer.computeCI(tb.getBatchMeansXP()));
 
-        // --- Export sequenze grezze (facoltativo, utile per ricontrollare l'ACF su questa run più lunga) ---
+        // --- Export sequenze (per ricontrollare l'ACF su questa run) ---
         ctx.metrics.exportSequenceToCsv("response_times_system.csv", ctx.metrics.getResponseTimesSystem());
         ctx.metrics.exportSequenceToCsv("response_times_B.csv", ctx.metrics.getResponseTimesB());
         System.out.println("\nFile esportati (percorso assoluto):");

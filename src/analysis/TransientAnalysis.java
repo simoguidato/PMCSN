@@ -1,3 +1,5 @@
+package analysis;
+
 import controllers.PSServer;
 import engine.SimulationEngine;
 import engine.SystemContext;
@@ -18,8 +20,8 @@ public class TransientAnalysis {
     public static void main(String[] args) throws Exception {
 
         // lambda=1.2: punto più critico dello scan (Obiettivo 1), il caso che determina la soglia di warm-up
-        //             da usare per l'intero scan 0.5-1.2 (tempo di rilassamento piu' lungo, rho_B=0.96)
-        // lambda=0.5: stesso punto operativo usato dai colleghi per il confronto (rho_B=0.4, rilassamento atteso molto piu' rapido)
+        //             da usare per l'intero scan 0.5-1.2
+        // lambda=0.5: per il confronto (rho_B=0.4, rilassamento atteso molto piu' rapido)
         runTransientAnalysis(1.2, 150_000, "transient_analysis_lambda1.2.csv");
         runTransientAnalysis(0.5, 150_000, "transient_analysis_lambda0.5.csv");
     }

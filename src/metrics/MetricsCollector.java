@@ -10,7 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class MetricsCollector {
-    // Aree per il calcolo del numero medio di Job (N) nel sistema globale (sull'intera run)
+    //calcolo del numero medio di Job (N) nel sistema globale (sull'intera run)
     private double areaA = 0.0;
     private double areaB = 0.0;
     private double areaP = 0.0;
@@ -29,7 +29,7 @@ public class MetricsCollector {
     private long totalJobsCompleted = 0;
     private double sumResponseTime = 0.0;
 
-    // Sequenze job-per-job (servono per l'analisi dell'autocorrelazione / batch means)
+    // Sequenze job-per-job
     private final List<Double> responseTimesSystem = new ArrayList<>(); // R del sistema, per job completato
     private final List<Double> responseTimesB = new ArrayList<>();      // tempo di sosta per-visita al Server B
 
@@ -39,9 +39,12 @@ public class MetricsCollector {
     // Campionamento a intervalli fissi di N(t) per-server (per l'analisi del transitorio)
     private TransientSampler transientSampler = null;
 
-    /** Attiva la raccolta a batch temporali fissi (durata deltaT) per N, U, X per-server. */
     public void enableTimeBatching(double deltaT) {
         this.timeBatchCollector = new TimeBatchCollector(deltaT);
+    }
+
+    public void enableTimeBatching(double deltaT, double startTime) {
+        this.timeBatchCollector = new TimeBatchCollector(deltaT, startTime);
     }
 
     public TimeBatchCollector getTimeBatchCollector() { return timeBatchCollector; }
@@ -70,7 +73,7 @@ public class MetricsCollector {
         }
     }
 
-    /** Da chiamare ogni volta che un job lascia una stazione (per il throughput X per-server). */
+    /* Da chiamare ogni volta che un job lascia una stazione (per il throughput X per-server). */
     public void recordDeparture(ServerId server, double eventTime) {
         switch (server) {
             case SERVER_A: totalComplA++; break;
@@ -89,7 +92,7 @@ public class MetricsCollector {
         responseTimesSystem.add(rt);
     }
 
-    /** Registra il tempo di sosta di una singola visita al Server B (per l'analisi dell'autocorrelazione). */
+    /* Registra il tempo di sosta di una singola visita al Server B (per analisi ACF). */
     public void recordServerBVisit(double responseTime) {
         responseTimesB.add(responseTime);
     }
@@ -128,7 +131,7 @@ public class MetricsCollector {
         }
     }
 
-    // Metodo fondamentale per il Warm-up (scarto del transitorio)
+    // scarto del transitorio
     public void reset() {
         areaA = 0;
         areaB = 0;

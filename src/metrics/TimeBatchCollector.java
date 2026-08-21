@@ -7,7 +7,7 @@ import java.util.List;
 
 public class TimeBatchCollector {
     private final double deltaT;
-    private double batchStart = 0.0;
+    private double batchStart;
 
     private double areaA = 0, areaB = 0, areaP = 0;
     private double busyA = 0, busyB = 0, busyP = 0;
@@ -24,10 +24,16 @@ public class TimeBatchCollector {
     private final List<Double> batchMeansXP = new ArrayList<>();
 
     public TimeBatchCollector(double deltaT) {
-        this.deltaT = deltaT;
+        this(deltaT, 0.0);
     }
 
-    /** Da chiamare per ogni intervallo [startTs,endTs] del motore, con la size corrente di ciascun server. */
+    /* startTime: istante di simulazione da cui iniziare a contare i batch  */
+    public TimeBatchCollector(double deltaT, double startTime) {
+        this.deltaT = deltaT;
+        this.batchStart = startTime;
+    }
+
+    /* per ogni intervallo [startTs,endTs] del motore, con la size corrente di ciascun server. */
     public void advance(double startTs, double endTs, int sizeA, int sizeB, int sizeP) {
         double t = startTs;
         while (t < endTs) {
@@ -66,44 +72,13 @@ public class TimeBatchCollector {
         complA = complB = complP = 0;
     }
 
-    /** Da chiamare ogni volta che un job lascia una stazione (per il throughput X). */
+    /* ogni volta che un job lascia una stazione (per il throughput X per-server). */
     public void recordDeparture(ServerId server, double eventTime) {
         switch (server) {
             case SERVER_A: complA++; break;
             case SERVER_B: complB++; break;
             case SERVER_P: complP++; break;
         }
-    }
-    /**
-     * Resetta le statistiche, gli accumulatori e i contatori temporali.
-     * Da chiamare al termine del periodo di warm-up.
-     */
-    public void reset() {
-        this.batchStart = 0.0;
-
-        this.areaA = 0.0;
-        this.areaB = 0.0;
-        this.areaP = 0.0;
-
-        this.busyA = 0.0;
-        this.busyB = 0.0;
-        this.busyP = 0.0;
-
-        this.complA = 0;
-        this.complB = 0;
-        this.complP = 0;
-
-        this.batchMeansNA.clear();
-        this.batchMeansNB.clear();
-        this.batchMeansNP.clear();
-
-        this.batchMeansUA.clear();
-        this.batchMeansUB.clear();
-        this.batchMeansUP.clear();
-
-        this.batchMeansXA.clear();
-        this.batchMeansXB.clear();
-        this.batchMeansXP.clear();
     }
 
     public List<Double> getBatchMeansNA() { return batchMeansNA; }

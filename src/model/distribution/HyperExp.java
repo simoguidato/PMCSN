@@ -5,7 +5,7 @@ import libs.Rngs;
 public class HyperExp implements Distribution {
     private Rngs rngs;
     private int streamIndex;
-    private double cv2; // Quadrato del Coefficiente di Variazione (deve essere > 1.0)
+    private double cv2;
 
     public HyperExp(Rngs rngs, int streamIndex, double cv) {
         this.rngs = rngs;
@@ -20,7 +20,7 @@ public class HyperExp implements Distribution {
     public double generate(double mean) {
         rngs.selectStream(streamIndex);
 
-        // Calcolo dei parametri per un'Iperesponenziale bilanciata
+        // Calcolo dei parametri per un'Iperesponenziale
         double p1 = 0.5 * (1.0 + Math.sqrt((cv2 - 1.0) / (cv2 + 1.0)));
         double p2 = 1.0 - p1;
         double m1 = mean / (2.0 * p1);
