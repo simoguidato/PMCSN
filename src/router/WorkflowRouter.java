@@ -19,15 +19,20 @@ public class WorkflowRouter {
                 job.setDemand(ctx.rng.getServiceTimeB(mean));
                 job.setCurrentClass(JobClass.CLASS_2);
                 job.setStationEntryTime(currentClock);
+
+                job.enterServer("B", currentClock); // [NUOVO] Registra ingresso
                 ctx.serverB.addJob(job);
             }
             else if (job.getCurrentClass() == JobClass.CLASS_2) {
                 double mean = ctx.params.getMeanServiceTime_P(JobClass.CLASS_2);
                 job.setDemand(ctx.rng.getServiceTimeP(mean));
                 job.setStationEntryTime(currentClock);
+
+                job.enterServer("P", currentClock); // [NUOVO] Registra ingresso
                 ctx.serverP.addJob(job);
             }
             else if (job.getCurrentClass() == JobClass.CLASS_3) {
+                // Il job esce dal sistema, il record finale viene chiuso dal MetricsCollector
                 ctx.metrics.recordJobCompleted(job, currentClock);
             }
         }
@@ -35,6 +40,8 @@ public class WorkflowRouter {
             double mean = ctx.params.getMeanServiceTime_A(JobClass.CLASS_2);
             job.setDemand(ctx.rng.getServiceTimeA(mean));
             job.setStationEntryTime(currentClock);
+
+            job.enterServer("A", currentClock); // [NUOVO] Registra ingresso (visita 2)
             ctx.serverA.addJob(job);
         }
         else if (currentServer == ServerId.SERVER_P) {
@@ -42,6 +49,8 @@ public class WorkflowRouter {
             double mean = ctx.params.getMeanServiceTime_A(JobClass.CLASS_3);
             job.setDemand(ctx.rng.getServiceTimeA(mean));
             job.setStationEntryTime(currentClock);
+
+            job.enterServer("A", currentClock); // [NUOVO] Registra ingresso (visita 3)
             ctx.serverA.addJob(job);
         }
     }

@@ -9,14 +9,15 @@ public class SimulationEngine {
     private double clock = 0.0;
     private double nextArrival;
 
+    // [NUOVO] Contatore per assegnare un ID univoco progressivo a ogni job
+    private int nextJobId = 1;
+
     public SimulationEngine(SystemContext ctx) {
         this.ctx = ctx;
         this.nextArrival = ctx.rng.getInterarrivalTime(ctx.params.lambda);
     }
 
-    public double getClock() {
-        return clock;
-    }
+    public double getClock() { return clock; }
 
     public void run(long maxJobs) {
         System.out.println("Avvio Simulazione PS (tag di servizio virtuale)...");
@@ -32,7 +33,6 @@ public class SimulationEngine {
         }
     }
 
-    /** Esegue un singolo passo. Ritorna true se l'orizzonte 'horizonCap' è stato raggiunto. */
     private boolean stepEvent(double horizonCap) {
         double nextDepA = ctx.getNextDepartureTimeA(clock);
         double nextDepB = ctx.getNextDepartureTimeB(clock);
@@ -51,22 +51,24 @@ public class SimulationEngine {
         double delta = nextEventTime - clock;
         ctx.metrics.updateAreas(clock, nextEventTime, ctx.serverA.size(), ctx.serverB.size(), ctx.serverP.size());
         advanceVirtualTimes(delta);
-
         clock = nextEventTime;
 
         if (clock == nextArrival) {
             handleArrival();
         } else if (clock == nextDepA) {
             Job completed = ctx.serverA.popCompletedJob();
+            completed.leaveServer(clock); // [NUOVO] Registra uscita
             ctx.metrics.recordDeparture(ServerId.SERVER_A, clock);
             ctx.router.routeJob(completed, ServerId.SERVER_A, clock);
         } else if (clock == nextDepB) {
             Job completed = ctx.serverB.popCompletedJob();
+            completed.leaveServer(clock); // [NUOVO] Registra uscita
             ctx.metrics.recordServerBVisit(clock - completed.getStationEntryTime());
             ctx.metrics.recordDeparture(ServerId.SERVER_B, clock);
             ctx.router.routeJob(completed, ServerId.SERVER_B, clock);
         } else if (clock == nextDepP) {
             Job completed = ctx.serverP.popCompletedJob();
+            completed.leaveServer(clock); // [NUOVO] Registra uscita
             ctx.metrics.recordDeparture(ServerId.SERVER_P, clock);
             ctx.router.routeJob(completed, ServerId.SERVER_P, clock);
         }
@@ -83,7 +85,10 @@ public class SimulationEngine {
         nextArrival = clock + ctx.rng.getInterarrivalTime(ctx.params.lambda);
         double mean = ctx.params.getMeanServiceTime_A(JobClass.CLASS_1);
         double demand = ctx.rng.getServiceTimeA(mean);
-        Job newJob = new Job(clock, JobClass.CLASS_1, demand);
+
+        // [NUOVO] Crea job con ID univoco e registra primo ingresso in Server A
+        Job newJob = new Job(nextJobId++, clock, JobClass.CLASS_1, demand);
+        newJob.enterServer("A", clock);
         ctx.serverA.addJob(newJob);
     }
 }

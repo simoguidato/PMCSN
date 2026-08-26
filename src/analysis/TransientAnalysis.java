@@ -16,7 +16,7 @@ public class TransientAnalysis {
     // Stessi 5 seed per ogni lambda, per confrontare "a parità di casualità" quanto cambia la velocità di assestamento
     private static final long MASTER_SEED = 123456789L;
     private static final double SAMPLE_INTERVAL = 100; // campionamento di N(t) ogni 100s
-    private static final int NUM_REPLICHE = 5;
+    private static final int NUM_REPLICHE = 64;
     public static void main(String[] args) throws Exception {
 
         // lambda=1.2: punto più critico dello scan (Obiettivo 1), il caso che determina la soglia di warm-up

@@ -13,46 +13,44 @@ public class Main {
 
     public static void main(String[] args) throws Exception {
 
-        // --- Parametri della run ---
         long seed = 123456789L;
-        double lambda = 1.2;      // punto operativo più critico (1FA)
-        int batchSize = 8000;     // fissata allo step 4 (autocorrelazione, caso più conservativo)
-        int targetBatches = 100;  // vogliamo almeno un centinaio di batch per un IC affidabile
+        double lambda = 1.2;
+        int batchSize = 8000;
+        int targetBatches = 100;
         long maxJobs = (long) batchSize * targetBatches;
 
-        // --- Setup del sistema ---
         Params params = new Params();
         params.lambda = lambda;
-        params.is2FA_enabled = false; // scenario base (1FA)
+        params.is2FA_enabled = false;
 
         RandomGenerator rng = new RandomGenerator(seed);
 
-        // Capacità = 1 => ogni server è un unico nodo Processor Sharing
         PSServer serverA = new PSServer(1.0, ServerState.IDLE, 0);
         PSServer serverB = new PSServer(1.0, ServerState.IDLE, 1);
         PSServer serverP = new PSServer(1.0, ServerState.IDLE, 2);
 
         SystemContext ctx = new SystemContext(params, rng, serverA, serverB, serverP);
 
-        // ΔT per il batching temporale di N, U, X: tempo medio per generare `batchSize` arrivi
         double deltaT = batchSize / lambda;
         ctx.metrics.enableTimeBatching(deltaT);
 
-        SimulationEngine engine = new SimulationEngine(ctx);
+        // [NUOVO] Abilita il tracking per-job su file
+        ctx.metrics.enableJobTracing("trace_visite_job.csv");
 
-        // --- Esecuzione ---
+        SimulationEngine engine = new SimulationEngine(ctx);
         engine.run(maxJobs);
+
+        // [NUOVO] Chiudi il file alla fine
+        ctx.metrics.closeTracing();
 
         double clock = engine.getClock();
         System.out.println("\n--- Run completata ---");
         System.out.printf("Job completati: %d, Tempo simulato: %.2f s%n", ctx.metrics.getTotalJobsCompleted(), clock);
 
-        // --- IC per il tempo di risposta di sistema R (batch means job-indicizzati) ---
         List<Double> batchMeansR = BatchMeansAnalyzer.batchMeansFromSequence(ctx.metrics.getResponseTimesSystem(), batchSize);
         BatchMeansAnalyzer.ConfidenceInterval ciR = BatchMeansAnalyzer.computeCI(batchMeansR);
         System.out.println("\nR (sistema): " + ciR);
 
-        // --- IC per N, U, X per-server (batch means temporali) ---
         TimeBatchCollector tb = ctx.metrics.getTimeBatchCollector();
 
         System.out.println("\n-- Server A --");
@@ -70,11 +68,6 @@ public class Main {
         System.out.println("U_P: " + BatchMeansAnalyzer.computeCI(tb.getBatchMeansUP()));
         System.out.println("X_P: " + BatchMeansAnalyzer.computeCI(tb.getBatchMeansXP()));
 
-        // --- Export sequenze (per ricontrollare l'ACF su questa run) ---
-        ctx.metrics.exportSequenceToCsv("response_times_system.csv", ctx.metrics.getResponseTimesSystem());
-        ctx.metrics.exportSequenceToCsv("response_times_B.csv", ctx.metrics.getResponseTimesB());
-        System.out.println("\nFile esportati (percorso assoluto):");
-        System.out.println(" - " + new java.io.File("response_times_system.csv").getAbsolutePath());
-        System.out.println(" - " + new java.io.File("response_times_B.csv").getAbsolutePath());
+        System.out.println("\nFile di Tracciamento generato: trace_visite_job.csv");
     }
 }
