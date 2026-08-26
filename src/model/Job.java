@@ -1,27 +1,27 @@
 package model;
 
-
 public class Job {
     private int id;
     private double arrivalTime;
     private double stationEntryTime; // istante di ingresso nella stazione CORRENTE
-    private JobClass currentClass;
-    private double remainingLife; // Lavoro rimanente per il PS
 
-    // Costruttore con ID
+    private JobClass currentClass;
+    private double demand;    // richiesta di servizio per la visita corrente, fissata all'ammissione
+    private double finishTag; // tag di completamento virtuale (S_ammissione + demand), assegnato dal server
+
     public Job(int id, double arrivalTime, JobClass currentClass, double initialDemand) {
         this.id = id;
         this.arrivalTime = arrivalTime;
         this.stationEntryTime = arrivalTime;
         this.currentClass = currentClass;
-        this.remainingLife = initialDemand;
+        this.demand = initialDemand;
     }
 
     public Job(double arrivalTime, JobClass currentClass, double initialDemand) {
         this.arrivalTime = arrivalTime;
         this.stationEntryTime = arrivalTime;
         this.currentClass = currentClass;
-        this.remainingLife = initialDemand;
+        this.demand = initialDemand;
     }
 
     public int getId() { return id; }
@@ -33,18 +33,9 @@ public class Job {
     public JobClass getCurrentClass() { return currentClass; }
     public void setCurrentClass(JobClass currentClass) { this.currentClass = currentClass; }
 
-    public double getRemainingLife() { return remainingLife; }
-    public void setRemainingLife(double remainingLife) { this.remainingLife = remainingLife; }
+    public double getDemand() { return demand; }
+    public void setDemand(double demand) { this.demand = demand; }
 
-    public void decreaseRemainingLife(double amount) throws Exception {
-        this.remainingLife -= amount;
-        if (this.remainingLife < 0) {
-            // Tolleranza per errori di virgola mobile (arrotondamenti)
-            if (this.remainingLife > -1e-9) {
-                this.remainingLife = 0.0;
-            } else {
-                throw new Exception("Errore: la vita residua del job è scesa sotto lo zero! (" + this.remainingLife + ")");
-            }
-        }
-    }
+    public double getFinishTag() { return finishTag; }
+    public void setFinishTag(double finishTag) { this.finishTag = finishTag; }
 }

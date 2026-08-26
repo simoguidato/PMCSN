@@ -1,36 +1,31 @@
 package controllers;
 
+import metrics.ServerStats;
 import model.Job;
 import model.ServerState;
 
-import java.text.DecimalFormat;
-import java.text.NumberFormat;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.Locale;
+import java.util.Comparator;
+import java.util.PriorityQueue;
 
-
-import model.JobList;
-import metrics.ServerStats;
-
+/**
+ * Implementazione del Processor Sharing basata su tag di servizio virtuale: ogni server tiene
+ * un unico contatore S (tempo di servizio virtuale, che avanza a velocità capacità/n finché n>0);
+ * ad ogni job, all'ammissione, viene assegnato un tag di completamento F = S + demand. Il job con
+ * F minimo è sempre il prossimo a completare, ed è sempre in cima alla min-heap: nessun ciclo su
+ * tutti i job ad ogni evento (costo O(log n) invece di O(n) per evento).
+ */
 public abstract class AbstractServer implements IServer {
-    private final DecimalFormat f;
     private ServerState serverState;
     protected double capacity;
-    protected JobList jobs;
+    protected double virtualClock = 0.0;
+    protected PriorityQueue<Job> activeJobs;
     protected ServerStats stats;
-    private Deque<Double> movingWindowResponseTime;
-    private static final int SLIDING_WINDOW_SIZE = 1000;
 
-    protected AbstractServer(double capacity, ServerState serverState, int index) {
+    public AbstractServer(double capacity, ServerState serverState, int index) {
         this.serverState = serverState;
         this.capacity = capacity;
-        this.jobs = new JobList();
-        this.stats = new ServerStats(index); // Se richiede index
-        this.movingWindowResponseTime = new ArrayDeque<>();
-
-        this.f = (DecimalFormat) NumberFormat.getInstance(Locale.US);
-        this.f.applyPattern("###0.00000000");
+        this.activeJobs = new PriorityQueue<>(Comparator.comparingDouble(Job::getFinishTag));
+        this.stats = new ServerStats(index);
     }
 
     public ServerState getServerState() { return serverState; }
@@ -39,44 +34,34 @@ public abstract class AbstractServer implements IServer {
     public ServerStats getStats() { return stats; }
 
     @Override
-    public void computeJobsAdvancement(double startTs, double endTs, Double completedJobResponseTime) throws Exception {
-        // Il job in completamento (se presente) è già dentro 'jobs' a questo punto
-        // (viene rimosso solo dopo, con popCompletedJob() chiamato dal simulatore).
-        // Quindi jobs.size() conta già correttamente tutti gli N job che si dividono
-        // la capacità nell'intervallo [startTs, endTs].
-        int jobAdvanced = jobs.size();
+    public void addJob(Job job) {
+        job.setFinishTag(virtualClock + job.getDemand());
+        activeJobs.add(job);
+    }
 
-        if (completedJobResponseTime != null) {
-            if(this.movingWindowResponseTime.size() == SLIDING_WINDOW_SIZE) {
-                this.movingWindowResponseTime.removeFirst();
-            }
-            this.movingWindowResponseTime.addLast(completedJobResponseTime);
-        }
-
-        if (jobAdvanced > 0) {
-            double quantum = (this.capacity / jobAdvanced) * (endTs - startTs);
-            // Assumiamo che JobList estenda Iterable<Job> o abbia un metodo getJobs()
-            for (Job job : this.jobs.getJobs()) {
-                job.decreaseRemainingLife(quantum);
-            }
+    @Override
+    public void advanceVirtualTime(double delta) {
+        int n = activeJobs.size();
+        if (n > 0) {
+            virtualClock += (capacity / n) * delta;
         }
     }
 
     @Override
-    public void addJob(Job job) { jobs.add(job); }
+    public double getNextCompletionTime(double now) {
+        if (activeJobs.isEmpty()) return Double.POSITIVE_INFINITY;
+        double gap = Math.max(0.0, activeJobs.peek().getFinishTag() - virtualClock);
+        double realDelay = gap * (activeJobs.size() / capacity);
+        return now + realDelay;
+    }
 
     @Override
-    public boolean activeJobExists() { return jobs.activeJobExists(); }
+    public Job popCompletedJob() {
+        return activeJobs.poll();
+    }
 
     @Override
-    public int size() { return jobs.size(); }
-
-    @Override
-    public double getMinRemainingLife() { return jobs.minRemainingLife(); }
-
-    @Override
-    public Job getMinRemainingLifeJob() { return jobs.getMinRemainingLifeJob(); }
-
-    @Override
-    public abstract Job popCompletedJob();
+    public int size() {
+        return activeJobs.size();
+    }
 }

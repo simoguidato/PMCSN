@@ -9,38 +9,64 @@ public class RandomGenerator {
     private Rngs rngs;
 
     // Assegniamo uno stream specifico per ogni processo stocastico.
+    // Usare stream separati evita correlazioni indesiderate tra gli eventi!
     public Distribution arrivals;
     public Distribution serviceA;
     public Distribution serviceB;
     public Distribution serviceP;
 
     public RandomGenerator(long seed) {
+        this(seed, true);
+    }
+
+    /**
+     * @param seed seme per l'inizializzazione degli stream
+     * @param serverBHyperExp se true, Server B usa l'iperesponenziale (CV=2.0, assunzione di questo lavoro);
+     *                        se false, usa l'esponenziale (come nel caso di studio originale) — utile per
+     *                        lo studio di confronto Esponenziale vs Iperesponenziale.
+     */
+    public RandomGenerator(long seed, boolean serverBHyperExp) {
         rngs = new Rngs();
         rngs.plantSeeds(seed);
 
-        // Assegniamo gli stream e il tipo di distribuzione
+        // Assegniamo gli stream e il tipo di distribuzione (Strategy Pattern)
         this.arrivals = new Exp(rngs, 0);
         this.serviceA = new Exp(rngs, 1);
 
-        // SERVER B: Iperesponenziale (alta variabilità della sessione utente, CV = 2.0)
-        this.serviceB = new HyperExp(rngs, 2, 2.0);
+        // SERVER B: Iperesponenziale (alta variabilità della sessione utente, CV = 2.0) di default,
+        // oppure Esponenziale se richiesto esplicitamente per il confronto.
+        this.serviceB = serverBHyperExp ? new HyperExp(rngs, 2, 2.0) : new Exp(rngs, 2);
 
         this.serviceP = new Exp(rngs, 3);
     }
 
+    /**
+     * Genera il tempo che intercorre fino al prossimo arrivo di un utente.
+     */
     public double getInterarrivalTime(double lambda) {
         double mean = 1.0 / lambda;
+        // Deleghiamo il calcolo all'oggetto 'arrivals'
         return arrivals.generate(mean);
     }
 
+    /**
+     * Genera il tempo di servizio per il Server A.
+     */
     public double getServiceTimeA(double meanServiceTime) {
+        // Deleghiamo il calcolo all'oggetto 'serviceA'
         return serviceA.generate(meanServiceTime);
     }
 
+    /**
+     * Genera il tempo di servizio per il Server B (iperesponenziale).
+     */
     public double getServiceTimeB(double meanServiceTime) {
         return serviceB.generate(meanServiceTime);
     }
 
+    /**
+     * Genera il tempo di servizio per il Server P (Pagamenti).
+     */
     public double getServiceTimeP(double meanServiceTime) {
         return serviceP.generate(meanServiceTime);
     }

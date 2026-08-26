@@ -27,19 +27,7 @@ public class SystemContext {
         this.router = new WorkflowRouter(this);
     }
 
-    // Proiezioni per il Processor Sharing
-    public double getNextDepartureTimeA(double clock) {
-        if (!serverA.activeJobExists()) return Double.POSITIVE_INFINITY;
-        return clock + (serverA.getMinRemainingLife() * serverA.size() / serverA.getCapacity());
-    }
-
-    public double getNextDepartureTimeB(double clock) {
-        if (!serverB.activeJobExists()) return Double.POSITIVE_INFINITY;
-        return clock + (serverB.getMinRemainingLife() * serverB.size() / serverB.getCapacity());
-    }
-
-    public double getNextDepartureTimeP(double clock) {
-        if (!serverP.activeJobExists()) return Double.POSITIVE_INFINITY;
-        return clock + (serverP.getMinRemainingLife() * serverP.size() / serverP.getCapacity());
-    }
+    public double getNextDepartureTimeA(double clock) { return serverA.getNextCompletionTime(clock); }
+    public double getNextDepartureTimeB(double clock) { return serverB.getNextCompletionTime(clock); }
+    public double getNextDepartureTimeP(double clock) { return serverP.getNextCompletionTime(clock); }
 }

@@ -17,7 +17,7 @@ import java.util.Locale;
 /**
  * Simulazione a orizzonte finito per l'Obiettivo 3 (scenario heavy).
  * A lambda=1.4 req/s il sistema supera il throughput bound (X0=1.25 req/s, Sez. Collo di bottiglia):
- * non esiste uno stato stazionario, quindi non si scarta il transitorio
+ * non esiste uno stato stazionario, quindi non si scarta il transitorio (E' il fenomeno da osservare)
  * e si usano repliche indipendenti anziché batch means.
  */
 public class HeavyLoadExperiment {
@@ -25,28 +25,32 @@ public class HeavyLoadExperiment {
     public static void main(String[] args) throws Exception {
 
         double lambda = 1.4;
-        double horizon = 20_000;      // orizzonte di osservazione [s]
+        double horizon = 150_000;     // orizzonte esteso, per verificare la convergenza del tasso di crescita
         double sampleInterval = 100;
-        // n = (z_0.975 / relative_width)^2 + 1, per un'ampiezza relativa dell'IC del 20%
-        int numReplications = 100;
+        // repliche ridotte rispetto al run precedente (100): con N_B che cresce linearmente,
+        // il costo per evento cresce con la lunghezza della coda -> costo totale ~ O(T^2).
+        // 30 repliche restano sufficienti per un IC ragionevole, tenendo il tempo di calcolo gestibile.
+        int numReplications = 50;
 
         int numSamples = (int) Math.floor(horizon / sampleInterval);
         double[][] allNA = new double[numReplications][numSamples];
         double[][] allNB = new double[numReplications][numSamples];
         double[][] allNP = new double[numReplications][numSamples];
 
-        for (int r = 0; r < numReplications; r++) {
-            long seed = 100_000_000L + r * 7919L; // seed diversi per ogni replica indipendente
+        long masterSeed = 123456789L;
+        RandomGenerator rng = new RandomGenerator(masterSeed);
 
+        for (int r = 0; r < numReplications; r++) {
             Params params = new Params();
             params.lambda = lambda;
             params.is2FA_enabled = false;
 
-            RandomGenerator rng = new RandomGenerator(seed);
             PSServer serverA = new PSServer(1.0, ServerState.IDLE, 0);
             PSServer serverB = new PSServer(1.0, ServerState.IDLE, 1);
             PSServer serverP = new PSServer(1.0, ServerState.IDLE, 2);
 
+            // Passi lo stesso oggetto 'rng'. Non essendo reinizializzato,
+            // la Replica 2 partirà ESATTAMENTE da dove ha finito la Replica 1.
             SystemContext ctx = new SystemContext(params, rng, serverA, serverB, serverP);
             ctx.metrics.enableTransientSampling(sampleInterval);
 
