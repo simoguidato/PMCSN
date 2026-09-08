@@ -8,85 +8,874 @@ import metrics.TimeBatchCollector;
 import model.ServerState;
 import utils.Params;
 import utils.RandomGenerator;
+import utils.RngSeedLogger;
 
+import java.io.File;
 import java.io.FileWriter;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
 /**
- * Confronto Server B Esponenziale vs Iperesponenziale al punto operativo piu' critico
- * (lambda=1.2, 1FA), stesso protocollo della Simulazione a regime (warm-up 100.000s,
- * batch means b=8000, 100 batch). Verifica empirica della proprieta' di insensibilita'
- * (medie attese uguali) e confronto della variabilita' dei tempi di risposta individuali.
+ * Confronto tra:
+ *
+ * - Server B Esponenziale
+ * - Server B HyperExp con CV = 2
+ *
+ * Punto operativo:
+ *
+ * lambda = 1.20
+ * scenario = 1FA
+ *
+ * Protocollo:
+ *
+ * - warm-up = 100000 s
+ * - 100 batch
+ * - batch size = 8000
+ * - intervalli di confidenza al 95%
+ *
+ * Le due distribuzioni rappresentano due configurazioni
+ * sperimentali distinte.
+ *
+ * Di conseguenza entrambe vengono inizializzate dal
+ * medesimo MASTER_SEED.
  */
 public class ExpVsHyperExpComparison {
 
-    public static void main(String[] args) throws Exception {
+    private static final long MASTER_SEED =
+            123456789L;
 
-        long seed = 123456789L;
-        double lambda = 1.2;
-        double warmupTime = 100_000;
-        int batchSize = 8000;
-        long jobsAfterWarmup = (long) batchSize * 100;
+    private static final double LAMBDA =
+            1.20;
 
-        for (boolean hyperExp : new boolean[]{false, true}) {
-            String label = hyperExp ? "HyperExp" : "Exp";
+    private static final double WARMUP_TIME =
+            100_000.0;
 
-            Params params = new Params();
-            params.lambda = lambda;
-            params.is2FA_enabled = false;
+    private static final int BATCH_SIZE =
+            8000;
 
-            RandomGenerator rng = new RandomGenerator(seed, hyperExp);
-            PSServer serverA = new PSServer(1.0, ServerState.IDLE, 0);
-            PSServer serverB = new PSServer(1.0, ServerState.IDLE, 1);
-            PSServer serverP = new PSServer(1.0, ServerState.IDLE, 2);
+    private static final int NUM_BATCHES =
+            100;
 
-            SystemContext ctx = new SystemContext(params, rng, serverA, serverB, serverP);
-            SimulationEngine engine = new SimulationEngine(ctx);
 
-            engine.runForTime(warmupTime);
-            ctx.metrics.reset();
-            ctx.metrics.enableTimeBatching(batchSize / lambda, engine.getClock());
-            engine.run(jobsAfterWarmup);
+    public static void main(String[] args)
+            throws Exception {
 
-            BatchMeansAnalyzer.ConfidenceInterval ciR = BatchMeansAnalyzer.computeCI(
-                    BatchMeansAnalyzer.batchMeansFromSequence(ctx.metrics.getResponseTimesSystem(), batchSize));
-            TimeBatchCollector tb = ctx.metrics.getTimeBatchCollector();
-            BatchMeansAnalyzer.ConfidenceInterval ciNB = BatchMeansAnalyzer.computeCI(tb.getBatchMeansNB());
-            BatchMeansAnalyzer.ConfidenceInterval ciUB = BatchMeansAnalyzer.computeCI(tb.getBatchMeansUB());
-            BatchMeansAnalyzer.ConfidenceInterval ciXB = BatchMeansAnalyzer.computeCI(tb.getBatchMeansXB());
 
-            System.out.printf("%n=== Server B: %s ===%n", label);
-            System.out.printf("R    = %s%n", ciR);
-            System.out.printf("N_B  = %s%n", ciNB);
-            System.out.printf("U_B  = %s%n", ciUB);
-            System.out.printf("X_B  = %s%n", ciXB);
+        /*
+         * Numero di response time validi richiesti:
+         *
+         * 100 × 8000 = 800000
+         */
+        long requiredResponses =
+                (long) BATCH_SIZE
+                        * NUM_BATCHES;
+        File csvDir =
+                new File("csv");
 
-            // Statistiche sulla distribuzione dei tempi di sosta individuali al Server B
-            // (non solo le medie di batch, ma la variabilita' vera e propria)
-            List<Double> rb = ctx.metrics.getResponseTimesB();
-            double mean = rb.stream().mapToDouble(x -> x).average().orElse(0);
-            double var = rb.stream().mapToDouble(x -> (x - mean) * (x - mean)).average().orElse(0);
-            double std = Math.sqrt(var);
-            double cv = std / mean;
-            double p95 = percentile(rb, 0.95);
-            double max = rb.stream().mapToDouble(x -> x).max().orElse(0);
 
-            System.out.printf("Tempi di sosta a B (individuali, n=%d): media=%.3f  std=%.3f  CV=%.3f  p95=%.3f  max=%.3f%n",
-                    rb.size(), mean, std, cv, p95, max);
+        if (!csvDir.exists()) {
 
-            // Esporta la sequenza grezza per l'istogramma
-            try (FileWriter fw = new FileWriter("response_times_B_" + label + ".csv")) {
-                fw.write("value\n");
-                for (double v : rb) fw.write(String.format(Locale.US, "%.6f%n", v));
+            boolean created =
+                    csvDir.mkdirs();
+
+
+            if (!created
+                    && !csvDir.exists()) {
+
+                throw new IllegalStateException(
+                        "Impossibile creare la directory: "
+                                + csvDir.getAbsolutePath()
+                );
             }
         }
+
+
+        File summaryFile =
+                new File(
+                        csvDir,
+                        "exp_vs_hyperexp_comparison.csv"
+                );
+
+
+        File seedsFile =
+                new File(
+                        csvDir,
+                        "exp_vs_hyperexp_rng_seeds.csv"
+                );
+
+
+        /*
+         * RngSeedLogger scrive in append.
+         *
+         * Per una nuova campagna cancelliamo
+         * il vecchio file dei seed.
+         */
+        if (seedsFile.exists()
+                && !seedsFile.delete()) {
+
+            throw new IllegalStateException(
+                    "Impossibile eliminare il vecchio file RNG: "
+                            + seedsFile.getAbsolutePath()
+            );
+        }
+
+        try (FileWriter summaryWriter =
+                     new FileWriter(summaryFile)) {
+
+
+            summaryWriter.write(
+                    "distribution,"
+                            + "R_mean,R_hw,"
+                            + "N_B_mean,N_B_hw,"
+                            + "U_B_mean,U_B_hw,"
+                            + "X_B_mean,X_B_hw,"
+                            + "B_mean,B_std,B_cv,"
+                            + "B_p95,B_max,B_samples\n"
+            );
+
+
+            /*
+             * false -> B Exp
+             * true  -> B HyperExp CV=2
+             */
+            boolean[] distributions = {
+
+                    false,
+                    true
+            };
+
+
+            /*
+             * =================================================
+             * CICLO SULLE DUE CONFIGURAZIONI
+             * =================================================
+             */
+
+            for (boolean hyperExp :
+                    distributions) {
+
+
+                String label =
+                        hyperExp
+                                ? "HyperExp"
+                                : "Exp";
+
+
+                System.out.printf(
+                        Locale.US,
+
+                        "%n========================================%n"
+                                + "Server B: %s%n"
+                                + "lambda = %.2f%n"
+                                + "scenario = 1FA%n"
+                                + "========================================%n",
+
+                        label,
+                        LAMBDA
+                );
+
+
+                /*
+                 * =================================================
+                 * 1. PARAMETRI
+                 * =================================================
+                 */
+
+                Params params =
+                        new Params();
+
+
+                params.lambda =
+                        LAMBDA;
+
+
+                params.is2FA_enabled =
+                        false;
+
+
+                /*
+                 * =================================================
+                 * 2. RNG
+                 * =================================================
+                 *
+                 * Exp e HyperExp sono due NUOVE
+                 * configurazioni.
+                 *
+                 * Entrambe ripartono quindi dal
+                 * medesimo MASTER_SEED.
+                 */
+                RandomGenerator rng =
+                        new RandomGenerator(
+                                MASTER_SEED,
+                                hyperExp
+                        );
+
+
+                /*
+                 * =================================================
+                 * 3. LOG DEGLI STREAM RNG
+                 * =================================================
+                 *
+                 * Il logging viene effettuato PRIMA
+                 * della creazione del SimulationEngine,
+                 * cioè prima che vengano consumati
+                 * numeri casuali per inizializzare
+                 * la simulazione.
+                 *
+                 * repetition = 0:
+                 *
+                 * ciascuna configurazione viene
+                 * eseguita mediante una singola
+                 * long run.
+                 */
+                RngSeedLogger.append(
+                        seedsFile.getPath(),
+                        "ExpVsHyperExpComparison",
+                        label,
+                        0,
+                        rng
+                );
+
+
+                /*
+                 * =================================================
+                 * 4. SERVER PS
+                 * =================================================
+                 */
+
+                PSServer serverA =
+                        new PSServer(
+                                1.0,
+                                ServerState.IDLE,
+                                0
+                        );
+
+
+                PSServer serverB =
+                        new PSServer(
+                                1.0,
+                                ServerState.IDLE,
+                                1
+                        );
+
+
+                PSServer serverP =
+                        new PSServer(
+                                1.0,
+                                ServerState.IDLE,
+                                2
+                        );
+
+
+                /*
+                 * =================================================
+                 * 5. SISTEMA
+                 * =================================================
+                 */
+
+                SystemContext ctx =
+                        new SystemContext(
+                                params,
+                                rng,
+                                serverA,
+                                serverB,
+                                serverP
+                        );
+
+
+                SimulationEngine engine =
+                        new SimulationEngine(
+                                ctx
+                        );
+
+
+                /*
+                 * =================================================
+                 * 6. WARM-UP
+                 * =================================================
+                 */
+
+                System.out.println(
+                        "--- Warm-up ---"
+                );
+
+
+                engine.runForTime(
+                        WARMUP_TIME
+                );
+
+
+                double measurementStart =
+                        engine.getClock();
+
+
+                /*
+                 * Azzeriamo le statistiche raccolte
+                 * durante il transitorio.
+                 *
+                 * NON vengono resettati:
+                 *
+                 * - RNG
+                 * - stato dei server
+                 * - job presenti
+                 * - clock
+                 */
+                ctx.metrics.reset();
+
+
+                /*
+                 * Per R vengono considerati soltanto
+                 * i job il cui arrivo esterno è
+                 * successivo al warm-up.
+                 */
+                ctx.metrics
+                        .setResponseCollectionStartTime(
+                                measurementStart
+                        );
+
+
+                /*
+                 * =================================================
+                 * 7. BATCHING TEMPORALE
+                 * =================================================
+                 */
+
+                double deltaT =
+                        BATCH_SIZE
+                                / LAMBDA;
+
+
+                ctx.metrics
+                        .enableTimeBatching(
+                                deltaT,
+                                measurementStart
+                        );
+
+
+                /*
+                 * =================================================
+                 * 8. MISURA A REGIME
+                 * =================================================
+                 */
+
+                System.out.println(
+                        "--- Misura a regime ---"
+                );
+
+
+                long completionTarget =
+                        requiredResponses;
+
+
+                /*
+                 * Alcuni job completati dopo il reset
+                 * potrebbero essere arrivati prima
+                 * del termine del warm-up.
+                 *
+                 * Continuiamo quindi finché abbiamo:
+                 *
+                 * - almeno 800000 response time validi
+                 * - almeno 100 batch temporali
+                 */
+                while (true) {
+
+
+                    engine.run(
+                            completionTarget
+                    );
+
+
+                    int validResponses =
+                            ctx.metrics
+                                    .getResponseTimesSystem()
+                                    .size();
+
+
+                    int timeBatches =
+                            ctx.metrics
+                                    .getTimeBatchCollector()
+                                    .getBatchMeansNB()
+                                    .size();
+
+
+                    boolean enoughResponses =
+                            validResponses
+                                    >= requiredResponses;
+
+
+                    boolean enoughTimeBatches =
+                            timeBatches
+                                    >= NUM_BATCHES;
+
+
+                    if (enoughResponses
+                            && enoughTimeBatches) {
+
+                        break;
+                    }
+
+
+                    /*
+                     * Prolunghiamo la simulazione
+                     * di altri 8000 completamenti.
+                     */
+                    completionTarget +=
+                            BATCH_SIZE;
+                }
+
+
+                /*
+                 * =================================================
+                 * 9. RESPONSE TIME END-TO-END
+                 * =================================================
+                 *
+                 * Usiamo esattamente:
+                 *
+                 * 100 × 8000 response time.
+                 */
+
+                List<Double> validR =
+                        firstN(
+                                ctx.metrics
+                                        .getResponseTimesSystem(),
+
+                                (int) requiredResponses
+                        );
+
+
+                BatchMeansAnalyzer
+                        .ConfidenceInterval ciR =
+
+                        BatchMeansAnalyzer
+                                .computeCI(
+
+                                        BatchMeansAnalyzer
+                                                .batchMeansFromSequence(
+                                                        validR,
+                                                        BATCH_SIZE
+                                                )
+                                );
+
+
+                /*
+                 * =================================================
+                 * 10. STATISTICHE SERVER B
+                 * =================================================
+                 */
+
+                TimeBatchCollector tb =
+                        ctx.metrics
+                                .getTimeBatchCollector();
+
+
+                BatchMeansAnalyzer
+                        .ConfidenceInterval ciNB =
+
+                        BatchMeansAnalyzer
+                                .computeCI(
+
+                                        firstN(
+                                                tb.getBatchMeansNB(),
+                                                NUM_BATCHES
+                                        )
+                                );
+
+
+                BatchMeansAnalyzer
+                        .ConfidenceInterval ciUB =
+
+                        BatchMeansAnalyzer
+                                .computeCI(
+
+                                        firstN(
+                                                tb.getBatchMeansUB(),
+                                                NUM_BATCHES
+                                        )
+                                );
+
+
+                BatchMeansAnalyzer
+                        .ConfidenceInterval ciXB =
+
+                        BatchMeansAnalyzer
+                                .computeCI(
+
+                                        firstN(
+                                                tb.getBatchMeansXB(),
+                                                NUM_BATCHES
+                                        )
+                                );
+
+
+                /*
+                 * =================================================
+                 * 11. DISTRIBUZIONE DEI TEMPI DI SOSTA A B
+                 * =================================================
+                 *
+                 * Qui non studiamo soltanto la media,
+                 * ma anche:
+                 *
+                 * - deviazione standard
+                 * - CV
+                 * - percentile 95
+                 * - massimo
+                 *
+                 * Serve per confrontare la variabilità
+                 * del caso Exp con HyperExp.
+                 */
+
+                List<Double> responseTimesB =
+                        ctx.metrics
+                                .getResponseTimesB();
+
+
+                double meanB =
+                        mean(
+                                responseTimesB
+                        );
+
+
+                double stdB =
+                        standardDeviation(
+                                responseTimesB,
+                                meanB
+                        );
+
+
+                double cvB =
+                        stdB / meanB;
+
+
+                double p95B =
+                        percentile(
+                                responseTimesB,
+                                0.95
+                        );
+
+
+                double maxB =
+                        responseTimesB
+                                .stream()
+                                .mapToDouble(
+                                        Double::doubleValue
+                                )
+                                .max()
+                                .orElse(
+                                        Double.NaN
+                                );
+
+
+                /*
+                 * =================================================
+                 * 12. ESPORTAZIONE DEI RESPONSE TIME GREZZI DI B
+                 * =================================================
+                 */
+
+                File rawFile =
+                        new File(
+                                csvDir,
+                                "response_times_B_"
+                                        + label
+                                        + ".csv"
+                        );
+
+
+                try (FileWriter rawWriter =
+                             new FileWriter(rawFile)) {
+
+
+                    rawWriter.write(
+                            "value\n"
+                    );
+
+
+                    for (double value :
+                            responseTimesB) {
+
+
+                        rawWriter.write(
+                                String.format(
+                                        Locale.US,
+                                        "%.12f%n",
+                                        value
+                                )
+                        );
+                    }
+                }
+
+
+                /*
+                 * =================================================
+                 * 13. OUTPUT CONSOLE
+                 * =================================================
+                 */
+
+                System.out.printf(
+                        Locale.US,
+
+                        "Completamenti post-reset = %d%n"
+                                + "Response time validi     = %d%n"
+                                + "Batch temporali prodotti = %d%n"
+                                + "%n"
+                                + "R   = %.6f +/- %.6f%n"
+                                + "N_B = %.6f +/- %.6f%n"
+                                + "U_B = %.6f +/- %.6f%n"
+                                + "X_B = %.6f +/- %.6f%n"
+                                + "%n"
+                                + "Tempi individuali B:%n"
+                                + "n    = %d%n"
+                                + "mean = %.6f%n"
+                                + "std  = %.6f%n"
+                                + "CV   = %.6f%n"
+                                + "p95  = %.6f%n"
+                                + "max  = %.6f%n",
+
+                        ctx.metrics
+                                .getTotalJobsCompleted(),
+
+                        ctx.metrics
+                                .getResponseTimesSystem()
+                                .size(),
+
+                        tb.getBatchMeansNB()
+                                .size(),
+
+                        ciR.mean,
+                        ciR.halfWidth,
+
+                        ciNB.mean,
+                        ciNB.halfWidth,
+
+                        ciUB.mean,
+                        ciUB.halfWidth,
+
+                        ciXB.mean,
+                        ciXB.halfWidth,
+
+                        responseTimesB.size(),
+                        meanB,
+                        stdB,
+                        cvB,
+                        p95B,
+                        maxB
+                );
+
+
+                summaryWriter.write(
+                        String.format(
+                                Locale.US,
+
+                                "%s,"
+                                        + "%.6f,%.6f,"
+                                        + "%.6f,%.6f,"
+                                        + "%.6f,%.6f,"
+                                        + "%.6f,%.6f,"
+                                        + "%.6f,%.6f,%.6f,"
+                                        + "%.6f,%.6f,%d%n",
+
+                                label,
+
+                                ciR.mean,
+                                ciR.halfWidth,
+
+                                ciNB.mean,
+                                ciNB.halfWidth,
+
+                                ciUB.mean,
+                                ciUB.halfWidth,
+
+                                ciXB.mean,
+                                ciXB.halfWidth,
+
+                                meanB,
+                                stdB,
+                                cvB,
+                                p95B,
+                                maxB,
+
+                                responseTimesB.size()
+                        )
+                );
+            }
+        }
+
+        System.out.println(
+                "\nFile risultati:"
+        );
+
+        System.out.println(
+                summaryFile.getAbsolutePath()
+        );
+
+
+        System.out.println(
+                "\nFile seed RNG:"
+        );
+
+        System.out.println(
+                seedsFile.getAbsolutePath()
+        );
+
+
+        System.out.println(
+                "\nFile response time B:"
+        );
+
+        System.out.println(
+                new File(
+                        csvDir,
+                        "response_times_B_Exp.csv"
+                ).getAbsolutePath()
+        );
+
+        System.out.println(
+                new File(
+                        csvDir,
+                        "response_times_B_HyperExp.csv"
+                ).getAbsolutePath()
+        );
     }
 
-    private static double percentile(List<Double> data, double p) {
-        List<Double> sorted = new java.util.ArrayList<>(data);
-        java.util.Collections.sort(sorted);
-        int idx = (int) Math.ceil(p * sorted.size()) - 1;
-        return sorted.get(Math.max(0, Math.min(idx, sorted.size() - 1)));
+    private static List<Double> firstN(
+            List<Double> values,
+            int n) {
+
+
+        if (values.size()
+                < n) {
+
+
+            throw new IllegalStateException(
+                    "Campioni insufficienti: richiesti "
+                            + n
+                            + ", disponibili "
+                            + values.size()
+            );
+        }
+
+
+        return new ArrayList<>(
+                values.subList(
+                        0,
+                        n
+                )
+        );
+    }
+
+
+    private static double mean(
+            List<Double> values) {
+
+
+        if (values.isEmpty()) {
+
+            return Double.NaN;
+        }
+
+
+        double sum =
+                0.0;
+
+
+        for (double value :
+                values) {
+
+            sum +=
+                    value;
+        }
+
+
+        return sum
+                / values.size();
+    }
+
+
+    private static double standardDeviation(
+            List<Double> values,
+            double mean) {
+
+
+        if (values.isEmpty()) {
+
+            return Double.NaN;
+        }
+
+
+        double sum =
+                0.0;
+
+
+        for (double value :
+                values) {
+
+
+            double difference =
+                    value
+                            - mean;
+
+
+            sum +=
+                    difference
+                            * difference;
+        }
+
+
+        /*
+         * Qui si descrive empiricamente
+         * l'intera sequenza osservata, quindi
+         * utilizziamo 1/n.
+         */
+        return Math.sqrt(
+                sum
+                        / values.size()
+        );
+    }
+
+
+    private static double percentile(
+            List<Double> data,
+            double p) {
+
+
+        if (data.isEmpty()) {
+
+            return Double.NaN;
+        }
+
+
+        List<Double> sorted =
+                new ArrayList<>(
+                        data
+                );
+
+
+        Collections.sort(
+                sorted
+        );
+
+
+        int index =
+                (int) Math.ceil(
+                        p
+                                * sorted.size()
+                )
+                        - 1;
+
+
+        index =
+                Math.max(
+                        0,
+                        Math.min(
+                                index,
+                                sorted.size() - 1
+                        )
+                );
+
+
+        return sorted.get(
+                index
+        );
     }
 }

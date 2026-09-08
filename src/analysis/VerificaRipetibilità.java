@@ -9,18 +9,13 @@ import model.ServerState;
 import utils.Params;
 import utils.RandomGenerator;
 
-/**
- * Verifica di riproducibilità: riesegue esattamente lo stesso setup usato in RegimeExperiment
- * per lambda=1.2, 1FA (stesso seed, stessa soglia di warm-up, stessa batch size), e stampa
- * gli stessi valori puntuali già ottenuti in precedenza, per un confronto diretto.
- * Se il sistema RNG multi-stream è corretto e deterministico, i valori devono coincidere
- * esattamente (entro la precisione dei double) con quelli della run originale.
- */
 public class VerificaRipetibilità {
 
-    public static void main(String[] args) throws Exception {
+    private static class Result {
+        double r, nB, xB;
+    }
 
-        long seed = 123456789L;
+    private static Result runSimulation(long seed) {
         double lambda = 1.2;
         double warmupTime = 100_000;
         int batchSize = 8000;
@@ -43,15 +38,25 @@ public class VerificaRipetibilità {
         ctx.metrics.enableTimeBatching(batchSize / lambda, engine.getClock());
         engine.run(jobsAfterWarmup);
 
-        BatchMeansAnalyzer.ConfidenceInterval ciR = BatchMeansAnalyzer.computeCI(
-                BatchMeansAnalyzer.batchMeansFromSequence(ctx.metrics.getResponseTimesSystem(), batchSize));
+        Result res = new Result();
+        res.r = BatchMeansAnalyzer.computeCI(
+                BatchMeansAnalyzer.batchMeansFromSequence(ctx.metrics.getResponseTimesSystem(), batchSize)).mean;
         TimeBatchCollector tb = ctx.metrics.getTimeBatchCollector();
-        BatchMeansAnalyzer.ConfidenceInterval ciNB = BatchMeansAnalyzer.computeCI(tb.getBatchMeansNB());
-        BatchMeansAnalyzer.ConfidenceInterval ciXB = BatchMeansAnalyzer.computeCI(tb.getBatchMeansXB());
+        res.nB = BatchMeansAnalyzer.computeCI(tb.getBatchMeansNB()).mean;
+        res.xB = BatchMeansAnalyzer.computeCI(tb.getBatchMeansXB()).mean;
+        return res;
+    }
 
-        System.out.println("=== Verifica di ripetibilita' (seed=123456789, lambda=1.2, 1FA) ===");
-        System.out.printf("R  = %.10f  (originale: 24.4530080000)%n", ciR.mean);
-        System.out.printf("N_B = %.10f  (originale: 23.2315690000)%n", ciNB.mean);
-        System.out.printf("X_B = %.10f  (originale: 1.1991410000)%n", ciXB.mean);
+    public static void main(String[] args) {
+        long seed = 123456789L;
+
+        System.out.println("=== Verifica di Riproducibilita' Deterministica ===");
+        Result r1 = runSimulation(seed);
+        Result r2 = runSimulation(seed);
+
+        System.out.printf("Metrica       Run 1           Run 2           Diff%n");
+        System.out.printf("E[R]   [s]    %.6f        %.6f        %.6f%n", r1.r,  r2.r,  Math.abs(r1.r - r2.r));
+        System.out.printf("E[N_B] [job]  %.6f        %.6f        %.6f%n", r1.nB, r2.nB, Math.abs(r1.nB - r2.nB));
+        System.out.printf("X_B    [r/s]  %.6f        %.6f        %.6f%n", r1.xB, r2.xB, Math.abs(r1.xB - r2.xB));
     }
 }

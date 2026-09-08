@@ -17,7 +17,7 @@ public class WorkflowRouter {
             if (job.getCurrentClass() == JobClass.CLASS_1) {
                 double mean = ctx.params.getMeanServiceTime_B(JobClass.CLASS_1);
                 job.setDemand(ctx.rng.getServiceTimeB(mean));
-                job.setCurrentClass(JobClass.CLASS_2);
+
                 job.setStationEntryTime(currentClock);
 
                 job.enterServer("B", currentClock); // [NUOVO] Registra ingresso
@@ -37,6 +37,7 @@ public class WorkflowRouter {
             }
         }
         else if (currentServer == ServerId.SERVER_B) {
+            job.setCurrentClass(JobClass.CLASS_2);
             double mean = ctx.params.getMeanServiceTime_A(JobClass.CLASS_2);
             job.setDemand(ctx.rng.getServiceTimeA(mean));
             job.setStationEntryTime(currentClock);

@@ -28,3 +28,9 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+
+trace_visite_job.csv
+response_times_*.csv
+*.class
+target/
+.idea/
